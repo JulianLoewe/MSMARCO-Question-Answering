@@ -60,8 +60,8 @@ def _organize(flat, span_only, answered_only):
     print("Start Organizing Data...")
     counter = 0
     for qid, passages, query, answers in flat:
-        if counter % 100000 == 0:
-            print("Organizing progress: {} x 10⁴/80 x 10⁴".format(counter/10000))
+        if counter % 10000 == 0:
+            print("Organizing progress: {} x 10⁴".format(counter/10000))
         counter = counter + 1
 
         if answers is None and not answered_only:
