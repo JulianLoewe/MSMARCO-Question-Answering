@@ -9,11 +9,14 @@ Module used to manage data:
 import torch
 from torch.autograd import Variable
 import numpy as np
+from multiprocessing import Pool
+import functools
+import time
 
 from mrcqa.text_input import rich_tokenize
 
 
-def load_data(source, span_only, answered_only):
+def load_data(source, span_only, answered_only, loading_limit=None):
     """
     Load the data, and use it to create example triples.
     Input is a dictionary, output is a list of example triples, with added
@@ -35,9 +38,13 @@ def load_data(source, span_only, answered_only):
     queries = source['query']
     passages = source['passages']
     answers = source.get('answers', {})
-
-    flat = ((qid, passages[qid], queries[qid], answers.get(qid))
-            for qid in query_ids)
+    if loading_limit and loading_limit < len(query_ids):
+        keys = list(query_ids.keys())
+        flat = ((qid, passages[qid], queries[qid], answers.get(qid))
+                for qid in keys[0:loading_limit])
+    else:
+        flat = ((qid, passages[qid], queries[qid], answers.get(qid))
+                for qid in query_ids)
 
     organized, filtered_out = _organize(flat, span_only, answered_only)
     return organized, filtered_out
@@ -50,12 +57,17 @@ def _organize(flat, span_only, answered_only):
     filtered_out = set()
 
     organized = []
-
+    print("Start Organizing Data...")
+    counter = 0
     for qid, passages, query, answers in flat:
+        if counter % 100000 == 0:
+            print("Organizing progress: {} x 10⁴/80 x 10⁴".format(counter/10000))
+        counter = counter + 1
+
         if answers is None and not answered_only:
             filtered_out.add(qid)
             continue  # Skip non-answered queries
-
+        
         matching = set()
         for ans in answers:
             if len(ans) == 0:
@@ -89,7 +101,6 @@ def _organize(flat, span_only, answered_only):
 
     return organized, filtered_out
 
-
 def tokenize_data(data, token_to_id, char_to_id, limit=None):
     """
     Tokenize a data set, with mapping of tokens to index in origin.
@@ -106,7 +117,12 @@ def tokenize_data(data, token_to_id, char_to_id, limit=None):
     Answer indexes are start:stop range of tokens.
     """
     tokenized = []
+    counter = 0
     for qid, passage, query, (start, stop) in data:
+        if counter % 10000 == 0:
+            print("{} x 10⁴/{} x 10⁴".format(counter/10000,len(data)/10000))
+        counter = counter +1
+
         q_tokens, q_chars, _, _, _ = \
             rich_tokenize(query, token_to_id, char_to_id, update=True)
         p_tokens, p_chars, _, _, mapping = \
@@ -148,7 +164,6 @@ def tokenize_data(data, token_to_id, char_to_id, limit=None):
              (q_tokens, q_chars),
              (start, stop),
              mapping))
-
     return tokenized
 
 
@@ -222,7 +237,11 @@ class SymbolEmbSourceText(SymbolEmbSource):
                 return False
 
         dim = None
+        count = 0
         for line in base_file:
+            if count % 100000 == 0:
+                print("Embeddings Loaded: {} Mio / 2.1 Mio".format(count/1000000))
+            count = count + 1
             line = line.strip().split()
             if not line or _skip(line[0]):
                 continue

@@ -33,7 +33,7 @@ python3 scripts/train.py <your experiment folder> <your datafolder>/train_v2.1.j
 ~~~
 python3 scripts/predict.py $EXP/ $DATA/dev_v2.1_candidate.json prediction.json --cuda=True
 ~~~
-To generate new embeddings from your embedding file instead instead of using random embeddings use the following command.
+To generate new embeddings from your embedding file instead of using random embeddings use the following command.
 ~~~
 python3 scripts/predict.py $EXP/ $DATA/dev_v2.1_candidate.json prediction.json --word_rep <your datafolder>/<chosen word embedding> --cuda=True
 ~~~

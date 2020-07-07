@@ -40,10 +40,11 @@ def try_to_resume(force_restart, exp_folder):
     return checkpoint, training_state, epoch
 
 
-def reload_state(checkpoint, training_state, config, args):
+def reload_state(checkpoint, training_state, config, args, loading_limit=None):
     """
     Reload state when resuming training.
     """
+    print('Load Model from Checkpoint [1/5]')
     model, id_to_token, id_to_char = BidafModel.from_checkpoint(
         config['bidaf'], checkpoint)
     if torch.cuda.is_available() and args.cuda:
@@ -52,16 +53,20 @@ def reload_state(checkpoint, training_state, config, args):
 
     optimizer = get_optimizer(model, config, training_state)
 
+    print('Create Inverse Dictionaries [2/5]')
     token_to_id = {tok: id_ for id_, tok in id_to_token.items()}
     char_to_id = {char: id_ for id_, char in id_to_char.items()}
 
     len_tok_voc = len(token_to_id)
     len_char_voc = len(char_to_id)
 
+    print('Load Data [3/5]')
     with open(args.data) as f_o:
         data, _ = load_data(json.load(f_o),
-                            span_only=True, answered_only=True)
+                            span_only=True, answered_only=True, loading_limit=loading_limit)
     limit_passage = config.get('training', {}).get('limit')
+
+    print('Tokenize Data [4/5]')
     data = tokenize_data(data, token_to_id, char_to_id, limit_passage)
 
     data = get_loader(data, config)
@@ -69,6 +74,7 @@ def reload_state(checkpoint, training_state, config, args):
     assert len(token_to_id) == len_tok_voc
     assert len(char_to_id) == len_char_voc
 
+    print('Done reload_state [5/5]')
     return model, id_to_token, id_to_char, optimizer, data
 
 
@@ -99,24 +105,25 @@ def get_loader(data, config):
     return data
 
 
-def init_state(config, args):
+def init_state(config, args, loading_limit):
     token_to_id = {'': 0}
     char_to_id = {'': 0}
-    print('Loading data...')
+    print('Load Data [1/6]')
     with open(args.data) as f_o:
-        data, _ = load_data(json.load(f_o), span_only=True, answered_only=True)
-    print('Tokenizing data...')
+        data, _ = load_data(json.load(f_o), span_only=True, answered_only=True, loading_limit=loading_limit)
+    print('Tokenize Data [2/6]')
     data = tokenize_data(data, token_to_id, char_to_id)
     data = get_loader(data, config)
 
+    print('Create Inverse Dictionaries [3/6]')
     id_to_token = {id_: tok for tok, id_ in token_to_id.items()}
     id_to_char = {id_: char for char, id_ in char_to_id.items()}
 
-    print('Creating model...')
+    print('Initiate Model [4/6]')
     model = BidafModel.from_config(config['bidaf'], id_to_token, id_to_char)
 
     if args.word_rep:
-        print('Loading pre-trained embeddings...')
+        print('Load pre-trained embeddings [5/6]')
         with open(args.word_rep) as f_o:
             pre_trained = SymbolEmbSourceText(
                     f_o,
@@ -131,6 +138,7 @@ def init_state(config, args):
                 model.embedder.embeddings[0].embeddings.weight.data.numpy(),
                 pre_trained, oovs))
     else:
+        print('No pre-trained embeddings given [5/6]')
         pass  # No pretraining, just keep the random values.
 
     # Char embeddings are already random, so we don't need to update them.
@@ -140,15 +148,17 @@ def init_state(config, args):
     model.train()
 
     optimizer = get_optimizer(model, config, state=None)
+    print('Done init_state [6/6]')
     return model, id_to_token, id_to_char, optimizer, data
 
 
-def train(epoch, model, optimizer, data, args):
+def train(epoch, model, optimizer, data, config, args):
     """
     Train for one epoch.
     """
-
+    batch_size=config.get('training', {}).get('batch_size', 32)
     for batch_id, (qids, passages, queries, answers, _) in enumerate(data):
+        print("{}-{}".format(batch_id*batch_size,data.n_samples))
         start_log_probs, end_log_probs = model(
             passages[:2], passages[2],
             queries[:2], queries[2])
@@ -217,7 +227,7 @@ def main():
 
     for epoch in epochs:
         print('Starting epoch', epoch)
-        train(epoch, model, optimizer, data, args)
+        train(epoch, model, optimizer, data, config, args)
         checkpointing.checkpoint(model, epoch, optimizer,
                                  checkpoint, args.exp_folder)
 

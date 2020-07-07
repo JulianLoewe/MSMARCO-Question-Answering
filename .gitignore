@@ -20,4 +20,6 @@ ConversationalSearch/data/*
 __pycache__/
 .ipynb_checkpoints/
 OpenKPAnnotations.tsv
+DATA/*
+Experimente/*
 
