@@ -211,7 +211,7 @@ def main():
     else:
         print('Preparing to train...')
         model, id_to_token, id_to_char, optimizer, data = init_state(
-            config, args)
+            config, args,10000)
         checkpoint = h5py.File(os.path.join(args.exp_folder, 'checkpoint'))
         checkpointing.save_vocab(checkpoint, 'vocab', id_to_token)
         checkpointing.save_vocab(checkpoint, 'c_vocab', id_to_char)

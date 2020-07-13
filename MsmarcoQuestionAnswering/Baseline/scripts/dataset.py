@@ -12,6 +12,7 @@ import numpy as np
 from multiprocessing import Pool
 import functools
 import time
+from torch.utils.data import IterableDataset
 
 from mrcqa.text_input import rich_tokenize
 
@@ -306,6 +307,7 @@ class SymbolEmbSourceNorm(SymbolEmbSource):
         if self.cache is not None:
             self.cache[symbol] = rep
         return rep
+
 
 
 class EpochGen(object):
