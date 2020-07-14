@@ -114,7 +114,7 @@ def init_state(config, args, loading_limit=None):
         data, _ = load_data(json.load(f_o), span_only=True, answered_only=True, loading_limit=loading_limit)
     print('Tokenize Data [2/6]')
     data = tokenize_data(data, token_to_id, char_to_id)
-    data = get_loader(data, config)
+    data = get_loader(data, config )
 
     print('Create Inverse Dictionaries [3/6]')
     id_to_token = {id_: tok for tok, id_ in token_to_id.items()}
@@ -153,11 +153,12 @@ def init_state(config, args, loading_limit=None):
     return model, id_to_token, id_to_char, optimizer, data
 
 
-def train(epoch, model, optimizer, data, config, args, exp_folder):
+def train(epoch, model, optimizer, data, config, args, exp_folder, checkpoint):
     """
     Train for one epoch.
     """
-    cp_path = os.path.join(exp_folder, 'checkpoint.opt')
+    print("Training next epoch for exp_folder {}".format(exp_folder))
+    #cp_path = os.path.join(exp_folder, 'checkpoint')
     batch_size=config.get('training', {}).get('batch_size', 32)
     for batch_id, (qids, passages, queries, answers, _) in enumerate(data):
         print("{}-{}".format(batch_id*batch_size,data.n_samples))
@@ -170,9 +171,10 @@ def train(epoch, model, optimizer, data, config, args, exp_folder):
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-        checkpointing.checkpoint(model, epoch, optimizer, checkpoint, exp_folder)
-        new_cp_path = os.path.join(exp_folder, 'checkpoint_ep_{}_batch_{}.opt'.format(epoch, batch_id))
-        os.system("cp ")
+        new_cp_path = os.path.join(exp_folder, 'checkpoint_ep_{}_batch_{}'.format(epoch, batch_id))
+        checkpointing.checkpoint(model, epoch, optimizer, h5py.File(new_cp_path, "w"), exp_folder)
+        #os.system("cp " + cp_path + " " + new_cp_path)
+        #os.system("cp " + cp_path + ".opt " + new_cp_path + ".opt")
 
     return
 
@@ -204,6 +206,7 @@ def main():
     args = argparser.parse_args()
     
     print("exp folder = {}".format(args.exp_folder))
+    exp_folder = args.exp_folder
 
     config_filepath = os.path.join(args.exp_folder, 'config.yaml')
     with open(config_filepath) as f:
@@ -211,6 +214,8 @@ def main():
 
     checkpoint, training_state, epoch = try_to_resume(
             args.force_restart, args.exp_folder)
+    
+    print("Starting with Checkpoint {}".format(checkpoint))
 
     if checkpoint:
         print('Resuming training...')
@@ -219,7 +224,7 @@ def main():
     else:
         print('Preparing to train...')
         model, id_to_token, id_to_char, optimizer, data = init_state(
-            config, args,10000)
+            config, args)
         checkpoint = h5py.File(os.path.join(args.exp_folder, 'checkpoint'))
         checkpointing.save_vocab(checkpoint, 'vocab', id_to_token)
         checkpointing.save_vocab(checkpoint, 'c_vocab', id_to_char)
@@ -235,7 +240,7 @@ def main():
 
     for epoch in epochs:
         print('Starting epoch', epoch)
-        train(epoch, model, optimizer, data, config, args, exp_folder = args.exp_folder)
+        train(epoch, model, optimizer, data, config, args, exp_folder, checkpoint)
         checkpointing.checkpoint(model, epoch, optimizer,
                                  checkpoint, args.exp_folder)
 
