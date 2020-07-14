@@ -7,6 +7,7 @@ import json
 import yaml
 import argparse
 import os.path
+import os
 import itertools
 
 import numpy as np
@@ -105,7 +106,7 @@ def get_loader(data, config):
     return data
 
 
-def init_state(config, args, loading_limit):
+def init_state(config, args, loading_limit=None):
     token_to_id = {'': 0}
     char_to_id = {'': 0}
     print('Load Data [1/6]')
@@ -152,10 +153,11 @@ def init_state(config, args, loading_limit):
     return model, id_to_token, id_to_char, optimizer, data
 
 
-def train(epoch, model, optimizer, data, config, args):
+def train(epoch, model, optimizer, data, config, args, exp_folder):
     """
     Train for one epoch.
     """
+    cp_path = os.path.join(exp_folder, 'checkpoint.opt')
     batch_size=config.get('training', {}).get('batch_size', 32)
     for batch_id, (qids, passages, queries, answers, _) in enumerate(data):
         print("{}-{}".format(batch_id*batch_size,data.n_samples))
@@ -168,6 +170,10 @@ def train(epoch, model, optimizer, data, config, args):
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
+        checkpointing.checkpoint(model, epoch, optimizer, checkpoint, exp_folder)
+        new_cp_path = os.path.join(exp_folder, 'checkpoint_ep_{}_batch_{}.opt'.format(epoch, batch_id))
+        os.system("cp ")
+
     return
 
 
@@ -196,6 +202,8 @@ def main():
                            "when generating random word representations.")
 
     args = argparser.parse_args()
+    
+    print("exp folder = {}".format(args.exp_folder))
 
     config_filepath = os.path.join(args.exp_folder, 'config.yaml')
     with open(config_filepath) as f:
@@ -227,7 +235,7 @@ def main():
 
     for epoch in epochs:
         print('Starting epoch', epoch)
-        train(epoch, model, optimizer, data, config, args)
+        train(epoch, model, optimizer, data, config, args, exp_folder = args.exp_folder)
         checkpointing.checkpoint(model, epoch, optimizer,
                                  checkpoint, args.exp_folder)
 
