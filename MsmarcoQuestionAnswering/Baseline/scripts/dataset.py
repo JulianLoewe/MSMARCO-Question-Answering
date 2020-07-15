@@ -316,7 +316,7 @@ class EpochGen(object):
     """
 
     def __init__(self, data, batch_size=32, shuffle=True,
-                 tensor_type=torch.LongTensor):
+                 tensor_type=torch.LongTensor, used_data_per_batch=1.0):
         """
         Parameters:
             :param: data: The dataset from which the data
@@ -334,6 +334,7 @@ class EpochGen(object):
         self.n_samples = len(data)
         self.idx = np.arange(self.n_samples)
         self.data = data
+        self.used_data_per_batch = used_data_per_batch
         return
 
     def process_batch_for_length(self, sequences, c_sequences):
@@ -366,7 +367,7 @@ class EpochGen(object):
         return (sequences, c_sequences, lengths)
 
     def __len__(self):
-        return (self.n_samples + self.batch_size - 1)//self.batch_size
+        return int(((self.n_samples + self.batch_size - 1)//self.batch_size)*self.used_data_per_batch)
 
     def __iter__(self):
         """
