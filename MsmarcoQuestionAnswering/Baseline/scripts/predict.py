@@ -30,22 +30,26 @@ def try_to_resume(exp_folder):
     return checkpoint
 
 
-def reload_state(checkpoint, config, args):
+def reload_state(checkpoint, config, args, loading_limit=None):
     """
     Reload state before predicting.
     """
-    print('Loading Model...')
+    print('Load Model from Checkpoint [1/5]')
     model, id_to_token, id_to_char = BidafModel.from_checkpoint(
         config['bidaf'], checkpoint)
 
+    print('Create Inverse Dictionaries [2/5]')
     token_to_id = {tok: id_ for id_, tok in id_to_token.items()}
     char_to_id = {char: id_ for id_, char in id_to_char.items()}
 
     len_tok_voc = len(token_to_id)
     len_char_voc = len(char_to_id)
 
+    print('Load Data [3/5]')
     with open(args.data) as f_o:
-        data, _ = load_data(json.load(f_o), span_only=True, answered_only=True)
+        data, _ = load_data(json.load(f_o), span_only=True, answered_only=True,loading_limit=loading_limit)
+    
+    print('Tokenize Data [4/5]')
     data = tokenize_data(data, token_to_id, char_to_id)
 
     id_to_token = {id_: tok for tok, id_ in token_to_id.items()}
