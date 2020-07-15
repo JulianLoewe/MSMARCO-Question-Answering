@@ -88,6 +88,7 @@ def load_file(p_path_to_data):
             if 'No Answer Present.' in answers:
                 no_answer_query_ids.add(query_id)
                 answers = ['']
+            #print(answers, query_id)
             all_answers.extend(answers)
             query_ids.extend([query_id]*len(answers))
 
@@ -96,10 +97,78 @@ def load_file(p_path_to_data):
     query_id_to_answers_map = {}
     for i, normalized_answer in enumerate(all_normalized_answers):
         query_id = query_ids[i]
+        #print(query_id)
         if query_id not in query_id_to_answers_map:
             query_id_to_answers_map[query_id] = []
         query_id_to_answers_map[query_id].append(normalized_answer)
     return query_id_to_answers_map, no_answer_query_ids
+
+def compute_metrics_from_model(p_path_to_reference_file, candidate_dictionary, candidate_no_answer_query_ids ,p_max_bleu_order=MAX_BLEU_ORDER):
+    #print(p_path_to_reference_file)
+    reference_dictionary, reference_no_answer_query_ids = \
+        load_file(p_path_to_reference_file)
+    #for query_id in reference_dictionary:
+    #    print(query_id, type(query_id))
+    #print(len(reference_dictionary))
+    query_id_answerable = set(reference_dictionary.keys())-reference_no_answer_query_ids
+    query_id_answerable_candidate = set(candidate_dictionary.keys())-candidate_no_answer_query_ids
+    
+    true_positives = len(query_id_answerable_candidate.intersection(query_id_answerable))
+    false_negatives = len(query_id_answerable)-true_positives
+    true_negatives = len(candidate_no_answer_query_ids.intersection(reference_no_answer_query_ids))
+    false_positives = len(reference_no_answer_query_ids)-true_negatives
+    precision = float(true_positives)/(true_positives+false_positives) if (true_positives+false_positives)>0 else 1.
+    recall = float(true_positives)/(true_positives+false_negatives) if (true_positives+false_negatives)>0 else 1.
+    #print(true_positives,false_negatives,true_negatives,false_positives, precision, recall)
+    F1 = 2 *(precision*recall)/(precision+recall)
+    filtered_reference_dictionary = \
+        {key: value for key, value in reference_dictionary.items() \
+                    if key not in reference_no_answer_query_ids}
+    filtered_reference_dictionary = reference_dictionary
+
+    filtered_candidate_dictionary = \
+        {key: value for key, value in candidate_dictionary.items() \
+                    if key not in reference_no_answer_query_ids}
+
+    for query_id, answers in filtered_candidate_dictionary.items():
+        assert \
+            len(answers) <= 1, \
+            'query_id %d contains more than 1 answer \"%s\" in candidate file' % \
+            (query_id, str(answers))
+
+    reference_query_ids = set(filtered_reference_dictionary.keys())
+    candidate_query_ids = set(filtered_candidate_dictionary.keys())
+    common_query_ids = reference_query_ids.intersection(candidate_query_ids)
+    filtered_reference_dictionary = {key: filtered_reference_dictionary[key] for key in common_query_ids}
+    reference_query_ids = set(filtered_reference_dictionary.keys())
+    #print(len(reference_query_ids), len(candidate_query_ids), len(common_query_ids))
+    
+    assert (len(common_query_ids) == len(reference_query_ids)) and \
+            (len(common_query_ids) == len(candidate_query_ids)), \
+           'Reference and candidate files must share same query ids'
+
+    all_scores = {}
+    bleu_scores, _ = \
+        Bleu(p_max_bleu_order).compute_score(filtered_reference_dictionary, \
+                                             filtered_candidate_dictionary)
+    for i, bleu_score in enumerate(bleu_scores):
+        all_scores['bleu_%d' % (i+1)] = bleu_score
+
+    rouge_score, _ = Rouge().compute_score(filtered_reference_dictionary, \
+                                           filtered_candidate_dictionary)
+    all_scores['rouge_l'] = rouge_score
+    all_scores['F1'] = F1
+    similarity = 0
+    for key in filtered_reference_dictionary:
+        candidate_answer = nlp(filtered_candidate_dictionary[key][0])
+        reference_answer = filtered_reference_dictionary[key]
+        answersimilarity = 0
+        for answer in reference_answer:
+            answersimilarity += candidate_answer.similarity(nlp(answer))
+        similarity += answersimilarity/len(reference_answer)
+    semantic_similarity = similarity/len(filtered_reference_dictionary)
+    all_scores['Semantic_Similarity'] = semantic_similarity
+    return all_scores
 
 def compute_metrics_from_files(p_path_to_reference_file,
                                p_path_to_candidate_file,
