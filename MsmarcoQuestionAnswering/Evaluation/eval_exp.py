@@ -196,6 +196,9 @@ def compute_metrics_from_files(p_path_to_reference_file,
     
     all_scores = {}
     all_scores['F1'] = F1
+    all_scores['Precision'] = precision
+    all_scores['Recall'] = recall
+    all_scores['Accuracy'] = (true_positives + true_negatives)/(true_positives + true_negatives + false_positives + false_negatives)
     #all_scores['Semantic_Similarity'] = (semantic_similarity/len(reference_dictionary))
     all_scores['rouge_l'] = (rouge_score/len(reference_dictionary))
     for i in range(0,4):

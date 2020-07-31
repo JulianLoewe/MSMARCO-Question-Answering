@@ -158,6 +158,9 @@ def compute_metrics_from_model(p_path_to_reference_file, candidate_dictionary, c
                                            filtered_candidate_dictionary)
     all_scores['rouge_l'] = rouge_score
     all_scores['F1'] = F1
+    all_scores['Precision'] = precision
+    all_scores['Recall'] = recall
+    all_scores['Accuracy'] = (true_positives + true_negatives)/(true_positives + true_negatives + false_positives + false_negatives)
     similarity = 0
     for key in filtered_reference_dictionary:
         candidate_answer = nlp(filtered_candidate_dictionary[key][0])
@@ -233,6 +236,9 @@ def compute_metrics_from_files(p_path_to_reference_file,
                                            filtered_candidate_dictionary)
     all_scores['rouge_l'] = rouge_score
     all_scores['F1'] = F1
+    all_scores['Precision'] = precision
+    all_scores['Recall'] = recall
+    all_scores['Accuracy'] = (true_positives + true_negatives)/(true_positives + true_negatives + false_positives + false_negatives)
     similarity = 0
     for key in filtered_reference_dictionary:
         candidate_answer = nlp(filtered_candidate_dictionary[key][0])
